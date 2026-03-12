@@ -7,7 +7,10 @@ export function formatCurrency(amount, currency = 'MYR') {
 }
 
 export function formatDate(dateStr) {
-  return new Date(dateStr).toLocaleDateString('en-GB', {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  if (isNaN(d)) return dateStr
+  return d.toLocaleDateString('en-GB', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
