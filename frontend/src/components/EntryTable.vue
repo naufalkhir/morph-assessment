@@ -1,8 +1,9 @@
 <template>
   <div class="table-wrapper">
-    <!-- Toolbar -->
+    <!-- ── Toolbar: search, date filters, export button ── -->
     <div class="toolbar">
       <div class="toolbar-filters">
+        <!-- @input uses debounce — waits 300ms before firing API call -->
         <input
           v-model="search"
           type="text"
@@ -10,6 +11,7 @@
           placeholder="Search description..."
           @input="debouncedFetch"
         />
+        <!-- Date range filters — fires immediately on change -->
         <input
           v-model="dateFrom"
           type="date"
@@ -27,22 +29,23 @@
       <button class="btn btn--primary" @click="exportCsv">⬇ Export CSV</button>
     </div>
 
-    <!-- Loading -->
+    <!-- ── Loading state — shows spinner while API call is in progress ── -->
     <div v-if="loading" class="state-box">
       <div class="spinner"></div>
       <span>Loading entries...</span>
     </div>
 
-    <!-- Empty -->
+    <!-- ── Empty state — shows when API returns no results ── -->
     <div v-else-if="!entries.length" class="state-box">
       <span>No entries found.</span>
     </div>
 
-    <!-- Table -->
+    <!-- ── Table — only renders when entries exist ── -->
     <div v-else class="table-scroll">
       <table class="table">
         <thead>
           <tr>
+            <!-- sortable columns — clicking fires sortBy() which toggles asc/desc -->
             <th @click="sortBy('description')" class="sortable">
               Description
               <span class="sort-icon">{{ sortIcon("description") }}</span>
@@ -65,24 +68,30 @@
           </tr>
         </thead>
         <tbody>
+          <!-- v-for renders one row per entry — :key helps Vue track DOM changes -->
           <tr v-for="entry in entries" :key="entry.id">
             <td>{{ entry.description }}</td>
+            <!-- formatCurrency from utils/format.js — uses Intl.NumberFormat -->
             <td class="mono">
               {{ formatCurrency(entry.amount, entry.currency) }}
             </td>
+            <!-- badge styled pill for currency code -->
             <td>
               <span class="badge">{{ entry.currency }}</span>
             </td>
+            <!-- formatDate from utils/format.js — converts to '10 Mar 2026' -->
             <td>{{ formatDate(entry.transaction_date) }}</td>
             <td class="text-muted">{{ formatDate(entry.created_at) }}</td>
             <td>
               <div class="actions">
+                <!-- opens EditModal with spread copy of entry to avoid mutating original -->
                 <button
                   class="btn-icon btn-icon--edit"
                   @click="openEdit(entry)"
                 >
                   ✏️
                 </button>
+                <!-- sets deleteEntry — triggers confirmation dialog -->
                 <button
                   class="btn-icon btn-icon--delete"
                   @click="confirmDelete(entry)"
@@ -96,13 +105,15 @@
       </table>
     </div>
 
-    <!-- Pagination -->
+    <!-- ── Pagination ── -->
     <div class="pagination" v-if="meta.last_page > 1 || entries.length">
       <div class="pagination-info">
+        <!-- ?? 0 — nullish coalescing, shows 0 if value is null/undefined -->
         Showing {{ meta.from ?? 0 }}–{{ meta.to ?? 0 }} of
         {{ meta.total ?? 0 }} entries
       </div>
       <div class="pagination-controls">
+        <!-- per_page selector — refetches on change -->
         <select
           v-model="perPage"
           class="filter-input per-page"
@@ -119,6 +130,7 @@
         >
           Prev
         </button>
+        <!-- dynamic page buttons — highlights active page with btn--primary -->
         <button
           v-for="p in meta.last_page"
           :key="p"
@@ -138,7 +150,7 @@
       </div>
     </div>
 
-    <!-- Edit Modal -->
+    <!-- ── Edit Modal — only renders when editEntry is not null ── -->
     <EditModal
       v-if="editEntry"
       :entry="editEntry"
@@ -146,7 +158,8 @@
       @updated="onUpdated"
     />
 
-    <!-- Delete Confirm -->
+    <!-- ── Delete Confirmation Dialog ── -->
+    <!-- @click.self — only closes when clicking the overlay, not the box -->
     <div v-if="deleteEntry" class="overlay" @click.self="deleteEntry = null">
       <div class="confirm-box">
         <h3 class="confirm-title">Delete Entry?</h3>
@@ -170,7 +183,7 @@
       </div>
     </div>
 
-    <!-- Toast -->
+    <!-- Toast notification — auto dismisses after 3 seconds -->
     <ToastNotification
       v-if="toast.show"
       :message="toast.message"
@@ -187,6 +200,7 @@ import { formatCurrency, formatDate } from "../utils/format.js";
 import EditModal from "./EditModal.vue";
 import ToastNotification from "./ToastNotification.vue";
 
+// ref() for single values
 const entries = ref([]);
 const meta = ref({});
 const loading = ref(false);
@@ -195,19 +209,23 @@ const perPage = ref(10);
 const search = ref("");
 const dateFrom = ref("");
 const dateTo = ref("");
-const sortCol = ref("created_at");
-const sortDir = ref("desc");
-const editEntry = ref(null);
-const deleteEntry = ref(null);
+const sortCol = ref("created_at"); // default sort column
+const sortDir = ref("desc"); // default sort direction
+const editEntry = ref(null); // null = modal closed, entry object = modal open
+const deleteEntry = ref(null); // null = dialog closed, entry object = dialog open
 const deleting = ref(false);
+
+// reactive() for toast — object with multiple related properties
 const toast = reactive({ show: false, message: "", type: "success" });
 
 let debounceTimer = null;
 
+// Debounce — waits 300ms after user stops typing before firing API call
+// Prevents spamming the API on every keystroke
 function debouncedFetch() {
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
-    page.value = 1;
+    page.value = 1; // reset to page 1 on new search
     fetchEntries();
   }, 300);
 }
@@ -221,13 +239,14 @@ async function fetchEntries() {
         per_page: perPage.value,
         sort: sortCol.value,
         order: sortDir.value,
+        // undefined params are excluded from the request automatically
         search: search.value || undefined,
         date_from: dateFrom.value || undefined,
         date_to: dateTo.value || undefined,
       },
     });
-    entries.value = data.data;
-    meta.value = data;
+    entries.value = data.data; // paginated entries array
+    meta.value = data; // pagination metadata (total, last_page, etc)
   } catch {
     showToast("Failed to load entries.", "error");
   } finally {
@@ -235,6 +254,7 @@ async function fetchEntries() {
   }
 }
 
+// Toggle sort direction if same column, reset to asc if new column
 function sortBy(col) {
   if (sortCol.value === col) {
     sortDir.value = sortDir.value === "asc" ? "desc" : "asc";
@@ -245,8 +265,9 @@ function sortBy(col) {
   fetchEntries();
 }
 
+// Returns sort indicator icon for column headers
 function sortIcon(col) {
-  if (sortCol.value !== col) return "↕";
+  if (sortCol.value !== col) return "↕"; // unsorted
   return sortDir.value === "asc" ? "▲" : "▼";
 }
 
@@ -263,6 +284,7 @@ function clearFilters() {
   fetchEntries();
 }
 
+// Spread operator — creates a copy so EditModal doesn't mutate the original
 function openEdit(entry) {
   editEntry.value = { ...entry };
 }
@@ -270,7 +292,7 @@ function openEdit(entry) {
 function onUpdated() {
   editEntry.value = null;
   showToast("Entry updated successfully!");
-  fetchEntries();
+  fetchEntries(); // refresh table after update
 }
 
 function confirmDelete(entry) {
@@ -283,7 +305,7 @@ async function doDelete() {
     await api.delete(`/entries/${deleteEntry.value.id}`);
     deleteEntry.value = null;
     showToast("Entry deleted.");
-    fetchEntries();
+    fetchEntries(); // refresh table after delete
   } catch {
     showToast("Failed to delete entry.", "error");
   } finally {
@@ -297,6 +319,8 @@ function showToast(message, type = "success") {
   toast.show = true;
 }
 
+// CSV export — builds CSV string from current page entries
+// Uses Blob API and URL.createObjectURL for browser download
 function exportCsv() {
   const headers = [
     "ID",
@@ -308,7 +332,7 @@ function exportCsv() {
   ];
   const rows = entries.value.map((e) => [
     e.id,
-    `"${e.description}"`,
+    `"${e.description}"`, // wrap in quotes — handles commas in description
     e.amount,
     e.currency,
     formatDate(e.transaction_date),
@@ -321,9 +345,10 @@ function exportCsv() {
   a.download = "entries.csv";
   a.click();
 }
+
+// Fetch entries when component first mounts
 onMounted(fetchEntries);
 </script>
-
 <style scoped>
 .table-wrapper {
   display: flex;

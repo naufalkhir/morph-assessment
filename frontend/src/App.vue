@@ -1,17 +1,26 @@
 <template>
   <div id="app">
+    <!-- Sticky navigation bar — stays at top when scrolling -->
     <nav class="nav">
       <div class="nav-inner">
+        <!-- App brand/logo -->
         <span class="nav-brand">💰 Morph Entries</span>
         <div class="nav-links">
+          <!-- RouterLink — Vue Router's equivalent of <a> tag -->
+          <!-- Automatically gets 'router-link-active' class when route matches -->
           <RouterLink to="/" class="nav-link">New Entry</RouterLink>
           <RouterLink to="/list" class="nav-link">All Entries</RouterLink>
+
+          <!-- Dark mode toggle — shows sun if dark, moon if light -->
           <button class="theme-toggle" @click="toggleTheme">
-            {{ isDark ? '☀️' : '🌙' }}
+            {{ isDark ? "☀️" : "🌙" }}
           </button>
         </div>
       </div>
     </nav>
+
+    <!-- RouterView — renders the current route's component here -->
+    <!-- Either HomeView or ListView depending on the URL -->
     <main class="main">
       <RouterView />
     </main>
@@ -19,25 +28,39 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted } from "vue";
 
-const isDark = ref(false)
+// Track dark mode state — ref() because it's a single boolean value
+const isDark = ref(false);
 
+// onMounted — runs after component is rendered in the DOM
+// Check localStorage for saved preference, or use system preference
 onMounted(() => {
-  const saved = localStorage.getItem('theme')
-  if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-    isDark.value = true
-    document.documentElement.setAttribute('data-theme', 'dark')
+  const saved = localStorage.getItem("theme");
+  if (
+    saved === "dark" ||
+    (!saved && window.matchMedia("(prefers-color-scheme: dark)").matches)
+  ) {
+    isDark.value = true;
+    // Set data-theme="dark" on <html> — triggers CSS custom property overrides
+    document.documentElement.setAttribute("data-theme", "dark");
   }
-})
+});
 
 function toggleTheme() {
-  isDark.value = !isDark.value
-  document.documentElement.setAttribute('data-theme', isDark.value ? 'dark' : '')
-  localStorage.setItem('theme', isDark.value ? 'dark' : 'light')
+  // Toggle the boolean
+  isDark.value = !isDark.value;
+
+  // Apply or remove dark theme on <html> element
+  document.documentElement.setAttribute(
+    "data-theme",
+    isDark.value ? "dark" : "",
+  );
+
+  // Persist preference so it survives page refresh
+  localStorage.setItem("theme", isDark.value ? "dark" : "light");
 }
 </script>
-
 <style scoped>
 .nav {
   background: var(--color-bg);
