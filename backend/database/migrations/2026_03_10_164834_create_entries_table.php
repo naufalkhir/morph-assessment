@@ -2,8 +2,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-return new class extends Migration
-{
+return new class extends Migration {
     public function up(): void
     {
         Schema::create('entries', function (Blueprint $table) {
@@ -13,6 +12,9 @@ return new class extends Migration
             $table->char('currency', 3)->default('MYR');
             $table->date('transaction_date');
             $table->timestamps();
+            $table->index('transaction_date');
+            $table->index('currency');
+            $table->index('created_at');
         });
     }
     public function down(): void

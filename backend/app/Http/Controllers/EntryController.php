@@ -30,7 +30,7 @@ class EntryController extends Controller
 
         $entries = Entry::query()
             // when() only applies filter if the parameter exists
-            ->when($request->search, fn($q, $s) => $q->where('description', 'like', "%{$s}%"))
+            ->when($request->search, fn($q, $s) => $q->where('description', 'like', "{$s}%"))
             ->when($request->date_from, fn($q, $d) => $q->whereDate('transaction_date', '>=', $d))
             ->when($request->date_to, fn($q, $d) => $q->whereDate('transaction_date', '<=', $d))
             ->when($request->currency, fn($q, $c) => $q->where('currency', strtoupper($c)))
